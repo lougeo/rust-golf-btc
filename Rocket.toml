@@ -1,0 +1,2 @@
+[default.databases.golf]
+url = "postgres://golf:golf@localhost/golf"
