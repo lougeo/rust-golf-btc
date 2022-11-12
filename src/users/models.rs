@@ -5,7 +5,6 @@ use sqlx::{postgres::PgRow, Row};
 use crate::DBConn;
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(crate = "rocket::serde")]
 pub struct BaseUser {
     pub id: i64,
     pub email: String,

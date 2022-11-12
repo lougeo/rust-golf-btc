@@ -1,51 +1,34 @@
 #[macro_use]
 extern crate rocket;
 
-use rocket::serde::json::Json;
+use rocket_db_pools::Database;
 
-use rocket_db_pools::sqlx::{self, Row};
-use rocket_db_pools::{Connection, Database};
-
-use crate::users::types::BaseUser;
-
+mod auth;
+mod errors;
 mod users;
+
+use crate::auth::security::ApiKey;
 
 #[derive(Database)]
 #[database("golf")]
 pub struct DBConn(sqlx::PgPool);
 
-#[get("/test")]
-fn test() -> Json<BaseUser> {
-    let test_user = BaseUser::create_user();
-    Json(test_user)
-}
-
-#[get("/users")]
-async fn user_list(db: Connection<DBConn>) -> Result<Json<Vec<BaseUser>>, Json<String>> {
-    match BaseUser::get_users(db).await {
-        Ok(users) => Ok(Json(users)),
-        Err(e) => Err(Json(e.to_string())),
-    }
-}
-
-#[get("/users/<id>")]
-async fn user_detail(mut db: Connection<DBConn>, id: i64) -> Option<String> {
-    sqlx::query("SELECT * FROM users WHERE id = ?")
-        .bind(id)
-        .fetch_one(&mut *db)
-        .await
-        .and_then(|r| Ok(r.try_get(0)?))
-        .ok()
-}
-
 #[get("/")]
-fn index() -> &'static str {
-    "Hello, world!"
+fn index(api_key: ApiKey) -> String {
+    format!("Hi, {:?}!", api_key)
+}
+
+#[get("/", rank = 2)]
+fn index_anonymous() -> &'static str {
+    "Please login"
 }
 
 #[launch]
 fn rocket() -> _ {
     rocket::build()
         .attach(DBConn::init())
-        .mount("/", routes![index, user_detail, user_list, test])
+        .mount("/", routes![index, index_anonymous])
+        .mount("/auth", auth::api::routes())
+        .mount("/user", users::api::routes())
+        .register("/", errors::api::catchers())
 }
